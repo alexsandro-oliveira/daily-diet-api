@@ -44,6 +44,25 @@ def logout():
     logout_user()
     return jsonify({'message': 'Logged out successfully'})
 
+@app.route('/user', methods=['POST'])
+@login_required
+def create_user():
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    role = data.get('role')
+
+    if username and password:
+        hashed_password = bcrypt.hashpw(str.encode(password), bcrypt.gensalt())
+        user = User.query.filter_by(username=current_user.username).first()
+        new_user = User(username=username, password=hashed_password, role=role if not None else 'user')
+        if User.query.filter_by(username=username).first():
+            return jsonify({"message": "User already exists"}), 400
+        
+        db.session.add(new_user)
+        db.session.commit()
+        return jsonify({"message": "Succesfully registered user"})
+    return jsonify({"message": "Invalid data"}), 400
 
 if __name__ == '__main__':
     app.run(debug=True)
