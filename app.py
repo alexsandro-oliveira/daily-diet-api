@@ -64,5 +64,118 @@ def create_user():
         return jsonify({"message": "Succesfully registered user"})
     return jsonify({"message": "Invalid data"}), 400
 
+@app.route('/user/<int:user_id>', methods=['GET'])
+@login_required
+def get_user(user_id):
+    user = User.query.get(user_id)
+    if user:
+        return jsonify({'id': user.id, 'username': user.username})
+    return jsonify({"message": "User not found!"}), 404
+
+@app.route('/user/<int:user_id>', methods=['PUT'])
+@login_required
+def update_user(user_id):
+    data = request.get_json()
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"message": "User not found!"}), 404
+    if user_id != current_user.id:
+        return jsonify({"message": "Unauthorized"}), 401
+    
+    password = data.get('password')
+    if password:
+        hashed_password = bcrypt.hashpw(str.encode(password), bcrypt.gensalt())
+        user.password = hashed_password
+
+    db.session.commit()
+    return jsonify({"message": f"Password of user {user.username} update successfully"})
+
+@app.route('/user/<int:user_id>', methods=['DELETE'])
+@login_required
+def delete_user(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"message": "User not found."}), 404
+    if user.id == current_user.id:
+        return jsonify ({"message": "The user cannot delete himself"}), 403
+    db.session.delete(user)
+    db.session.commit()
+    return jsonify({"message": f"User {user.username} deleted successfully"})    
+
+
+@app.route('/food', methods=['POST'])
+@login_required
+def create_food():
+    data = request.get_json()
+    title = data.get('title')
+    description = data.get('description')
+    eated_at = data.get('eated_at')
+    on_diet = data.get('on_diet')
+
+    user = current_user
+
+    if not user:
+        return jsonify({ "message": "Unauthorized"}), 401
+
+    if title and description:
+        new_food = Food(title=title, description=description, eated_at=eated_at, on_diet=on_diet, user_id=user.id)
+        db.session.add(new_food)
+        db.session.commit()
+        return jsonify({"message": f"Add Food successfully"})
+    return jsonify({"message": "Failure to add Food"})
+
+
+@app.route('/food', methods=['GET'])
+def get_food():
+    foods = Food.query.filter_by(user_id=current_user.id).all()
+    foods_list = []
+
+    for food in foods:
+        foods_list.append({
+            'title': food.title,
+            'description': food.description,
+            'eated_at': food.eated_at.strftime('%d-%m-%Y %H:%M:%S'),
+            'on_diet': food.on_diet
+        })
+
+    return jsonify(foods_list)
+
+@app.route('/food/<int:food_id>', methods=['GET'])
+def get_food_by_id(food_id):
+    food = Food.query.get(food_id)
+    if food:
+        return jsonify ({'title': food.title, 'description': food.description, 'eated_at': food.eated_at.strftime('%d-%m-%Y %H:%M:%S'), 'on_diet': food.on_diet })
+    
+@app.route('/food/<int:food_id>', methods=['PUT'])
+def update_food(food_id):
+    data = request.get_json()
+    food = Food.query.get(food_id)
+    if not food:
+        return jsonify({"message": "Food not found"}), 404
+    
+    title = data.get('title')
+    description = data.get('description')
+    on_diet = data.get('on_diet')
+    if title and description and on_diet:
+        food.title = title
+        food.desctiption = description
+        food.on_diet = on_diet
+    
+    db.session.commit()
+    return jsonify({"message": "Update successfully"})
+
+@app.route('/food/<int:food_id>', methods=['DELETE'])
+def delete_food(food_id):
+    food = Food.query.get(food_id)
+    
+    if not food:
+        return jsonify({"message": "Food not found."}), 404 
+    if food.user_id != current_user.id:
+        return jsonify({"message": "Unauthorized."}), 401 
+    db.session.delete(food)
+    db.session.commit()
+    return jsonify({"message": f"Food {food.title} deleted sucessfully"})
+     
+
 if __name__ == '__main__':
     app.run(debug=True)
